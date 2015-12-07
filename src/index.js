@@ -12,7 +12,7 @@ module.exports = (function () {
 			_.extend(
 				config.request,
 				{
-					dnsResolver: config.dnsResolver
+					dnsResolver: config.request.dnsResolver
 				}
 			)
 		);
