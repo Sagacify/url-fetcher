@@ -6,7 +6,7 @@ var contentEncodingMap = require('../http-specifications/content-encoding-map');
 module.exports = (function () {
 	'use strict';
 
-	function CompressionHandlerFactory () {
+	function CompressionHandlerFactory (config) {
 		config = config || {};
 
 		this.deflateHandler = new DeflateHandler(config.deflate);
