@@ -1,5 +1,6 @@
 var ICompressionHandler = require('./compression-handler/i-compression-handler');
 var IRequestHandler = require('./request-handler/i-request-handler');
+var _ = require('underscore');
 
 module.exports = (function () {
 	'use strict';
