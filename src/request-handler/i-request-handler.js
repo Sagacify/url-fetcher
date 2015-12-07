@@ -3,18 +3,16 @@ var RequestHandler = require('./request-handler');
 module.exports = (function () {
 	'use strict';
 
-	function IRequestHandler () {}
-
-	IRequestHandler.prototype.init = function (config) {
+	function IRequestHandler (config) {
 		config = config || {};
 
-		RequestHandler.init(config);
-	};
+		this.requestHandler = new RequestHandler(config);
+	}
 
-	IRequestHandler.prototype.stream = function (strUrl, options) {
+	IRequestHandler.prototype.stream = function (url, options) {
 		options = options || {};
 
-		if (typeof strUrl !== 'string' || !strUrl.length) {
+		if (typeof url !== 'string' || !url.length) {
 			return null;
 		}
 
@@ -22,8 +20,8 @@ module.exports = (function () {
 			return null;
 		}
 
-		return RequestHandler.stream(strUrl, options);
+		return this.requestHandler.stream(url, options);
 	};
 
-	return new IRequestHandler();
+	return IRequestHandler;
 })();
