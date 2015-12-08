@@ -67,9 +67,6 @@ module.exports = (function () {
 			}
 
 			callback(null, {
-				parentUrl: url,
-				parentType: type,
-
 				content: results
 			});
 		};
