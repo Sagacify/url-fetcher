@@ -133,7 +133,8 @@ module.exports = (function () {
 
 			var contentHandlerStream = this.openContentHandler(
 				res,
-				options.content
+				options.content,
+				_callback
 			);
 
 			if (contentHandlerStream === null) {
