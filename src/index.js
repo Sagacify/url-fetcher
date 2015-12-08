@@ -148,7 +148,7 @@ module.exports = (function () {
 			compressionHandlerStream.setEncoding('utf8');
 
 			compressionHandlerStream.pipe(contentHandlerStream);
-		});
+		}.bind(this));
 	};
 
 	return URLFetcher;
