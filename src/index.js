@@ -136,7 +136,7 @@ module.exports = (function () {
 
 			if (contentHandlerStream === null) {
 				return _callback(
-					new Error('URLFetcher::scrape() - No content handler was found for MIME type: `' + mimeType + '`')
+					new Error('URLFetcher::scrape() - No content handler was found for MIME type: `' + res.headers['content-type'] + '`')
 				);
 			}
 			else {
