@@ -58,7 +58,7 @@ class UrlFetcher {
 				compressionStream = res;
 			}
 
-			var contentStream = this.getContentStreamHandler(res).openStream(res, options, _callback);
+			var contentStream = getContentStreamHandler.openStream(res, options, _callback);
 
 			if (contentStream === null) {
 				return _callback( new Error('UrlFetcher::scrape() - No content handler was found for MIME type: `' + res.headers['content-type'] + '`') );
