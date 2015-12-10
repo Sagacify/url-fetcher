@@ -1,153 +1,90 @@
-var ICompressionHandler = require('./compression-handler/i-compression-handler');
-var IRequestHandler = require('./request-handler/i-request-handler');
+'use strict';
+
+var CompressionStreamHandler = require('./compression-stream-handler');
+var RequestStreamHandler = require('./request-stream-handler');
 var _ = require('underscore');
 
-module.exports = (function () {
-	'use strict';
+class UrlFetcher {
 
-	function URLFetcher (config) {
-		config = config || {};
-
-		this.compressionHandler = new ICompressionHandler(config.compression);
-		this.requestHandler = new IRequestHandler(
-			_.extend(
-				config.request,
-				{
-					dnsResolver: config.request.dnsResolver
-				}
-			)
-		);
-
-		this.maxTimeout = config.maxTimeout;
-	}
-
-	URLFetcher.prototype.scrape = function (url, options, callback) {
-		var streamList = [];
-		var _cleanup = function () {
-			streamList.forEach(function (stream) {
-				var streamName = stream.constructor.name;
-
-				if (
-					streamName === 'Request' &&
-					typeof stream.abort === 'function'
-				) {
-					try {
-						stream.abort();
-					}
-					catch (e) {}
-				}
-				else if (streamName === 'Gunzip' || streamName === 'Inflate') {
-					stream.end();
-				}
-				else {
-					this.closeContentHandler();
-				}
-			}.bind(this));
-		}.bind(this);
-
-		var called = false;
-
-		var callbackTimeout = setTimeout(function () {
-			_callback(
-				new Error('URLFetcher::scrape() - Callback timeout')
-			);
-		}, this.maxTimeout);
-
-		var _callback = function (e, results) {
-			if (called === true) {
-				return null;
-			}
-
-			called = true;
-			_cleanup();
-			clearTimeout(callbackTimeout);
-
-			if (e) {
-				return callback(e, null);
-			}
-
-			callback(null, {
-				content: results
-			});
-		};
-
-		var requestHandlerStream = this.requestHandler.stream(
-			url,
-			options.request
-		);
-
-		if (requestHandlerStream === null) {
-			return _callback(
-				new Error('URLFetcher::scrape() - No request handler was found for URL: `' + url + '`')
-			);
-		}
-		else {
-			streamList.push(requestHandlerStream);
-		}
-
-		requestHandlerStream.on('error', function (e) {
-			return _callback(e);
+	static scrape (options, contentStreamHandler, callback) {
+		options = _.defaults(options||{}, {
+			overallTimeout: 35000
 		});
 
-		requestHandlerStream.once('response', function (res) {
-			if (res.statusCode === 204) {
-				return _callback(
-					new Error('URLFetcher::scrape() - Page at URL: `' + url + '` is empty and returned HTTP status code 204')
-				);
-			}
+		var requestStreamHandler = new RequestStreamHandler();
+		var compressionStreamHandler = new CompressionStreamHandler();
 
-			if (res.statusCode === 404) {
-				return _callback(
-					new Error('URLFetcher::scrape() - Page at URL: `' + url + '` doesn\'t exist and returned HTTP status code 404')
-				);
-			}
+		var cleanup = () => {
+			requestStreamHandler.closeStream();
+			compressionStreamHandler.closeStream();
+			contentStreamHandler.closeStream();
+		};
 
-			if (res.statusCode < 200 || res.statusCode > 299) {
-				return _callback(
-					new Error('URLFetcher::scrape() - Request to URL: `' + url + '` encountered an error code and returned HTTP status code `' + res.statusCode + '`')
-				);
-			}
+		var called = false;
+		var _callback = (err, results) => {
+			if (called) { return; }
 
-			var encodingType = res.headers['content-encoding'];
+			called = true;
+			cleanup();
+			clearTimeout(callbackTimeout);
 
-			var compressionHandlerStream = this.compressionHandler.stream(
-				encodingType,
-				options.compression
-			);
+			return callback(err, { content: results });
+		};
 
-			if (compressionHandlerStream !== null) {
-				compressionHandlerStream.on('error', function (e) {
-					return _callback(e);
-				});
+		var callbackTimeout = setTimeout(() => {
+			_callback( new Error('UrlFetcher::scrape() - Callback timeout') );
+		}, options.overallTimeout);
 
-				res.pipe(compressionHandlerStream);
+		var requestStream = requestStreamHandler.openStream(options);
 
-				streamList.push(compressionHandlerStream);
-			}
-			else {
-				compressionHandlerStream = res;
-			}
+		if (!requestStream) {
+			return _callback( new Error('UrlFetcher::scrape() - No request handler was found for URL: `' + options.url + '`') );
+		}
 
-			var contentHandlerStream = this.openContentHandler(
-				res,
-				options.content,
-				_callback
-			);
+		requestStream.on('error', err => _callback(err) );
 
-			if (contentHandlerStream === null) {
-				return _callback(
-					new Error('URLFetcher::scrape() - No content handler was found for MIME type: `' + res.headers['content-type'] + '`')
-				);
+		requestStream.once('response', res => {
+			var err = this.extractRequestResponseError(res);
+			if(err) { return _callback(err); }
+
+			var compressionStream = compressionStreamHandler.openStream(res);
+
+			if (compressionStream !== null) {
+				compressionStream.on('error', err => _callback(err) );
+
+				res.pipe(compressionStream);
 			}
 			else {
-				streamList.push(contentHandlerStream);
+				compressionStream = res;
 			}
 
-			compressionHandlerStream.setEncoding('utf8');
+			var contentStream = contentStreamHandler.openStream(res, options, _callback);
 
-			compressionHandlerStream.pipe(contentHandlerStream);
-		}.bind(this));
-	};
+			if (contentStream === null) {
+				return _callback( new Error('UrlFetcher::scrape() - No content handler was found for MIME type: `' + res.headers['content-type'] + '`') );
+			}
 
-	return URLFetcher;
-})();
+			compressionStream.setEncoding('utf8');
+			compressionStream.pipe(contentStream);
+		});
+	}
+
+	static extractRequestResponseError (res) {
+		if (res.statusCode === 204) {
+			return new Error('UrlFetcher::scrape() - Page at URL: `' + options.url + '` is empty and returned HTTP status code 204');
+		}
+
+		if (res.statusCode === 404) {
+			return new Error('UrlFetcher::scrape() - Page at URL: `' + options.url + '` doesn\'t exist and returned HTTP status code 404');
+		}
+
+		if (res.statusCode < 200 || res.statusCode > 299) {
+			return new Error('UrlFetcher::scrape() - Request to URL: `' + options.url + '` encountered an error code and returned HTTP status code `' + res.statusCode + '`');
+		}
+
+		return null;
+	}
+}
+
+
+module.exports = UrlFetcher;
