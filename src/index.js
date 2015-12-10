@@ -44,7 +44,7 @@ class UrlFetcher {
 		requestStream.on('error', err => _callback(err) );
 
 		requestStream.once('response', res => {
-			var err = this.extractRequestResponseError(res);
+			var err = this.extractRequestResponseError(res, options.url);
 			if(err) { return _callback(err); }
 
 			var compressionStream = compressionStreamHandler.openStream(res);
@@ -58,7 +58,7 @@ class UrlFetcher {
 				compressionStream = res;
 			}
 
-			var contentStream = contentStreamHandler.openStream(res, options, _callback);
+			var contentStream = this.getContentStreamHandler(res).openStream(res, options, _callback);
 
 			if (contentStream === null) {
 				return _callback( new Error('UrlFetcher::scrape() - No content handler was found for MIME type: `' + res.headers['content-type'] + '`') );
@@ -69,17 +69,17 @@ class UrlFetcher {
 		});
 	}
 
-	static extractRequestResponseError (res) {
+	static extractRequestResponseError (res, url) {
 		if (res.statusCode === 204) {
-			return new Error('UrlFetcher::scrape() - Page at URL: `' + options.url + '` is empty and returned HTTP status code 204');
+			return new Error('UrlFetcher::scrape() - Page at URL: `' + url + '` is empty and returned HTTP status code 204');
 		}
 
 		if (res.statusCode === 404) {
-			return new Error('UrlFetcher::scrape() - Page at URL: `' + options.url + '` doesn\'t exist and returned HTTP status code 404');
+			return new Error('UrlFetcher::scrape() - Page at URL: `' + url + '` doesn\'t exist and returned HTTP status code 404');
 		}
 
 		if (res.statusCode < 200 || res.statusCode > 299) {
-			return new Error('UrlFetcher::scrape() - Request to URL: `' + options.url + '` encountered an error code and returned HTTP status code `' + res.statusCode + '`');
+			return new Error('UrlFetcher::scrape() - Request to URL: `' + url + '` encountered an error code and returned HTTP status code `' + res.statusCode + '`');
 		}
 
 		return null;
