@@ -42,9 +42,11 @@ class RequestHandler {
 			options.gzip = true;
 		}
 
-		this.stream = request(options);
-
-		this.stream.noDelay = true;
+		try {
+			this.stream = request(options);
+			this.stream.noDelay = true;
+		}
+		catch (e) {}
 
 		return this.stream;
 	}
